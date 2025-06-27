@@ -1494,8 +1494,42 @@
             }
             
             if (sortedCargo.length === 0) {
-                const li = document.
-                  log("System initialization complete. Enter pilot and ship details to begin.");
+createElement('li');
+                li.className = 'cargo-item';
+                li.textContent = 'Cargo hold empty';
+                cargoList.appendChild(li);
+            }
+        }
+
+        function startGame() {
+            const pilotName = document.getElementById('pilot-name').value.trim();
+            const shipName = document.getElementById('ship-name').value.trim();
+            
+            if (!pilotName || !shipName) {
+                alert('Please enter both pilot name and ship name.');
+                return;
+            }
+
+            gameState.pilotName = pilotName;
+            gameState.shipName = shipName;
+            
+            document.getElementById('display-pilot').textContent = pilotName;
+            document.getElementById('display-ship').textContent = shipName;
+            
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            generateAsteroids();
+            performScan();
+            updateDisplay();
+            updateButtonStates();
+            log(`Welcome aboard, Captain ${pilotName}. The ${shipName} is ready for operations.`);
+        }
+
+        // All the other functions...
+        
+        // Initialize game with setup screen
+        log("System initialization complete. Enter pilot and ship details to begin.");
     </script>
 </body>
 </html>
