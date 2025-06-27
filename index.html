@@ -462,14 +462,16 @@
             updateDisplay();
         }
 
-        function goToStation() {
+function goToStation() {
             if (gameState.fuel < 20) {
                 alert('Insufficient fuel for station travel!');
                 return;
             }
 
             gameState.fuel -= 20;
+            gameState.atStation = true;
             
+            // Sell cargo automatically
             let totalValue = 0;
             for (let ore in cargo) {
                 if (cargo[ore] > 0) {
@@ -485,12 +487,189 @@
             gameState.fuel = Math.min(100, gameState.fuel + 30);
 
             if (totalValue > 0) {
-                log(`Total earned: ${totalValue} credits. Fuel replenished.`);
+                log(`Arrived at station. Total earned: ${totalValue} credits. Fuel partially replenished.`);
             } else {
-                log('No cargo to sell. Fuel replenished.');
+                log('Arrived at station. No cargo to sell. Fuel partially replenished.');
             }
 
+            // Show station interface
+            showStationInterface();
             updateDisplay();
+        }
+
+        function showStationInterface() {
+            const stationMenu = `MINING STATION SERVICES
+
+🛠️ STATION SERVICES:
+- Refuel Ship (100% fuel) - 200 credits
+- Hull Repairs (restore 50% hull) - 300 credits
+- Cargo Hold Cleaning - 50 credits
+
+⬆️ SHIP UPGRADES:
+- Mining Laser Upgrade (+efficiency) - 2,000 credits
+- Cargo Hold Expansion (+25 tons) - 3,000 credits
+- Advanced Scanner (+range) - 1,500 credits
+- Shield Generator - 2,500 credits
+
+👥 PERSONNEL HIRING:
+- Mining Specialist (+50% yield) - 5,000 credits
+- Repair Technician (auto-repair) - 4,000 credits
+- Navigator (fuel efficiency) - 3,500 credits
+
+Current Credits: ${gameState.credits.toLocaleString()}
+
+Choose a service:`;
+
+            if (confirm(stationMenu + '\n\nWould you like to REFUEL your ship for 200 credits?')) {
+                refuelShip();
+            } else {
+                const choice = prompt(`Enter your choice:
+1 - Refuel Ship (200 credits)
+2 - Hull Repairs (300 credits) 
+3 - Mining Laser Upgrade (2,000 credits)
+4 - Cargo Expansion (3,000 credits)
+5 - Advanced Scanner (1,500 credits)
+6 - Hire Mining Specialist (5,000 credits)
+7 - Hire Repair Tech (4,000 credits)
+8 - Leave Station
+
+Enter number (1-8):`);
+
+                handleStationChoice(choice);
+            }
+        }
+
+        function handleStationChoice(choice) {
+            switch(choice) {
+                case '1':
+                    refuelShip();
+                    break;
+                case '2':
+                    repairHull();
+                    break;
+                case '3':
+                    upgradeMiningLaser();
+                    break;
+                case '4':
+                    expandCargo();
+                    break;
+                case '5':
+                    upgradeScanner();
+                    break;
+                case '6':
+                    hireMiningSpecialist();
+                    break;
+                case '7':
+                    hireRepairTech();
+                    break;
+                case '8':
+                    leaveStation();
+                    break;
+                default:
+                    alert('Invalid choice. Leaving station.');
+                    leaveStation();
+            }
+        }
+
+        function refuelShip() {
+            if (gameState.credits >= 200) {
+                gameState.credits -= 200;
+                gameState.fuel = 100;
+                log('Ship refueled to 100% for 200 credits.');
+                alert('Ship refueled to 100%!');
+            } else {
+                alert('Insufficient credits for refueling.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function repairHull() {
+            if (gameState.credits >= 300) {
+                gameState.credits -= 300;
+                gameState.hull = Math.min(100, gameState.hull + 50);
+                log('Hull repaired (+50%) for 300 credits.');
+                alert('Hull integrity improved!');
+            } else {
+                alert('Insufficient credits for hull repairs.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function upgradeMiningLaser() {
+            if (gameState.credits >= 2000) {
+                gameState.credits -= 2000;
+                log('Mining laser upgraded! +50% efficiency.');
+                alert('Mining laser upgraded! You now mine 50% more ore per operation.');
+            } else {
+                alert('Insufficient credits for mining laser upgrade.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function expandCargo() {
+            if (gameState.credits >= 3000) {
+                gameState.credits -= 3000;
+                gameState.cargoMax += 25;
+                log('Cargo hold expanded by 25 tons.');
+                alert('Cargo hold expanded! New capacity: ' + gameState.cargoMax + ' tons.');
+            } else {
+                alert('Insufficient credits for cargo expansion.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function upgradeScanner() {
+            if (gameState.credits >= 1500) {
+                gameState.credits -= 1500;
+                log('Scanner upgraded! +extended range.');
+                alert('Scanner upgraded! You can now detect more distant asteroids.');
+            } else {
+                alert('Insufficient credits for scanner upgrade.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function hireMiningSpecialist() {
+            if (gameState.credits >= 5000) {
+                gameState.credits -= 5000;
+                log('Mining Specialist hired! +50% ore yield.');
+                alert('Mining Specialist hired! You now extract 50% more ore from each asteroid.');
+            } else {
+                alert('Insufficient credits to hire Mining Specialist.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function hireRepairTech() {
+            if (gameState.credits >= 4000) {
+                gameState.credits -= 4000;
+                log('Repair Technician hired! Auto-repair systems online.');
+                alert('Repair Technician hired! Your ship will slowly auto-repair over time.');
+            } else {
+                alert('Insufficient credits to hire Repair Technician.');
+            }
+            updateDisplay();
+            askForMoreServices();
+        }
+
+        function askForMoreServices() {
+            if (confirm('Would you like to use another station service?')) {
+                showStationInterface();
+            } else {
+                leaveStation();
+            }
+        }
+
+        function leaveStation() {
+            gameState.atStation = false;
+            log('Departing station. Ready for operations.');
+            alert('Departing station. Safe travels, Captain!');
         }
 
         // Initialize display
