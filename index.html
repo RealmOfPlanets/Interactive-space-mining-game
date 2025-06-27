@@ -323,11 +323,21 @@
             }
         }
 
-        function scanAsteroids() {
-            if (gameState.fuel < 5) {
-                alert('Insufficient fuel for scanning!');
-                return;
-            }
+const scanFuelCost = 5;
+const stationFuelCost = 20;
+
+if (gameState.fuel < scanFuelCost) {
+    alert('Scanner offline - insufficient fuel!');
+    return;
+}
+
+// Warn if scanning would leave insufficient fuel to return
+if (gameState.fuel - scanFuelCost < stationFuelCost) {
+    const remainingFuel = gameState.fuel - scanFuelCost;
+    if (!confirm(`FUEL WARNING!\n\nScanning will consume ${scanFuelCost} fuel.\nAfter scanning, you'll have ${remainingFuel} fuel remaining.\nYou need ${stationFuelCost} fuel to return to station.\n\nProceed with scan?`)) {
+        return;
+    }
+}
 
             gameState.fuel -= 5;
             generateAsteroids();
