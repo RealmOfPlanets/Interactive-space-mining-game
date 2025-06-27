@@ -3,10 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Space Mining Game Test</title>
+    <title>Asteroid Mining Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+        .setup-form {
+            background: rgba(0, 40, 0, 0.9);
+            border: 2px solid #00ff00;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            margin: 50px auto;
+        }
+        .setup-form input {
+            background: rgba(0, 60, 0, 0.8);
+            border: 1px solid #00aa00;
+            color: #00ff00;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 16px;
+            width: 200px;
+        }
+        button {
+            background: rgba(0, 60, 0, 0.8);
+            color: #00ff00;
+            border: 1px solid #00aa00;
+            padding: 15px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        button:hover {
+            background: rgba(0, 80, 0, 1);
+            border-color: #00ff00;
+        }
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
-    <h1>Space Mining Game - Test Version</h1>
-    <button onclick="alert('Ready to build your game!')">Test Button</button>
+    <div id="setup-screen" class="setup-form">
+        <h2>MINING VESSEL INITIALIZATION</h2>
+        <p>Enter your pilot name and ship designation:</p>
+        <div>
+            <input type="text" id="pilot-name" placeholder="Pilot Name" maxlength="20">
+        </div>
+        <div>
+            <input type="text" id="ship-name" placeholder="Ship Name" maxlength="25">
+        </div>
+        <br>
+        <button onclick="startGame()">INITIALIZE SYSTEMS</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <h1>Welcome aboard, Captain!</h1>
+        <p>Game systems loading...</p>
+        <button onclick="goBack()">Back to Setup</button>
+    </div>
+
+    <script>
+        function startGame() {
+            const pilotName = document.getElementById('pilot-name').value.trim();
+            const shipName = document.getElementById('ship-name').value.trim();
+            
+            if (!pilotName || !shipName) {
+                alert('Please enter both pilot name and ship name.');
+                return;
+            }
+            
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            document.querySelector('#game-screen h1').textContent = `Welcome aboard, Captain ${pilotName}!`;
+            document.querySelector('#game-screen p').textContent = `The ${shipName} is ready for operations.`;
+        }
+        
+        function goBack() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+        }
+    </script>
 </body>
 </html>
