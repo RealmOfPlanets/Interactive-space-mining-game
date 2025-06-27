@@ -11,6 +11,67 @@
             background: #000;
             color: #00ff00;
             font-family: 'Courier New', monospace;
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 40px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+        }
+        .control-panel {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(0, 20, 0, 0.9);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px #00ff00;
+        }
+        .title {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .pilot-info {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .status-item {
+            background: rgba(0, 40, 0, 0.7);
+            border: 1px solid #00aa00;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .scanner {
+            background: rgba(0, 40, 0, 0.7);
+            border: 1px solid #00aa00;
+            padding: 15px;
+            border-radius: 5px;
+            height: 200px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
         }
         .setup-form {
             background: rgba(0, 40, 0, 0.9);
@@ -36,15 +97,17 @@
             background: rgba(0, 60, 0, 0.8);
             color: #00ff00;
             border: 1px solid #00aa00;
-            padding: 15px 20px;
+            padding: 15px 10px;
             border-radius: 5px;
             cursor: pointer;
             font-family: inherit;
             font-size: 14px;
+            transition: all 0.2s;
         }
         button:hover {
             background: rgba(0, 80, 0, 1);
             border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
         }
         .hidden { display: none; }
     </style>
@@ -63,13 +126,56 @@
         <button onclick="startGame()">INITIALIZE SYSTEMS</button>
     </div>
 
-    <div id="game-screen" class="hidden">
-        <h1>Welcome aboard, Captain!</h1>
-        <p>Game systems loading...</p>
-        <button onclick="goBack()">Back to Setup</button>
+    <div id="game-screen" class="control-panel hidden">
+        <div class="title">ASTEROID MINING VESSEL - CONTROL INTERFACE</div>
+        <div class="pilot-info">
+            Pilot: <span id="display-pilot">Unknown</span> | Ship: <span id="display-ship">Unnamed</span>
+        </div>
+        
+        <div class="status-grid">
+            <div class="status-item">
+                <div class="status-label">CREDITS</div>
+                <div class="status-value" id="credits">1,000</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">FUEL</div>
+                <div class="status-value" id="fuel">100%</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">HULL</div>
+                <div class="status-value" id="hull">100%</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">CARGO</div>
+                <div class="status-value" id="cargo">0/50 tons</div>
+            </div>
+        </div>
+
+        <div class="scanner">
+            <h3>SCANNER - NEARBY ASTEROIDS</h3>
+            <div id="asteroid-list">
+                <p>Click SCAN to detect nearby asteroids...</p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="scanAsteroids()">SCAN AREA</button>
+            <button onclick="alert('Mining system coming soon!')">MINE ASTEROID</button>
+            <button onclick="alert('Station travel coming soon!')">GO TO STATION</button>
+            <button onclick="goBack()">RESTART</button>
+        </div>
     </div>
 
     <script>
+        let gameState = {
+            pilotName: '',
+            shipName: '',
+            credits: 1000,
+            fuel: 100,
+            hull: 100,
+            cargo: 0
+        };
+
         function startGame() {
             const pilotName = document.getElementById('pilot-name').value.trim();
             const shipName = document.getElementById('ship-name').value.trim();
@@ -78,17 +184,43 @@
                 alert('Please enter both pilot name and ship name.');
                 return;
             }
+
+            gameState.pilotName = pilotName;
+            gameState.shipName = shipName;
+            
+            document.getElementById('display-pilot').textContent = pilotName;
+            document.getElementById('display-ship').textContent = shipName;
             
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
-            
-            document.querySelector('#game-screen h1').textContent = `Welcome aboard, Captain ${pilotName}!`;
-            document.querySelector('#game-screen p').textContent = `The ${shipName} is ready for operations.`;
         }
         
         function goBack() {
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('setup-screen').classList.remove('hidden');
+        }
+
+        function scanAsteroids() {
+            gameState.fuel -= 5;
+            document.getElementById('fuel').textContent = gameState.fuel + '%';
+            
+            document.getElementById('asteroid-list').innerHTML = `
+                <div style="margin: 5px 0; padding: 10px; background: rgba(0, 60, 0, 0.5); border-radius: 3px;">
+                    <strong>Asteroid 1</strong><br>
+                    Distance: 3.2 km<br>
+                    Ores: Iron (15 tons), Copper (8 tons)
+                </div>
+                <div style="margin: 5px 0; padding: 10px; background: rgba(0, 60, 0, 0.5); border-radius: 3px;">
+                    <strong>Asteroid 2</strong><br>
+                    Distance: 7.1 km<br>
+                    Ores: Titanium (5 tons), Ice (12 tons)
+                </div>
+                <div style="margin: 5px 0; padding: 10px; background: rgba(0, 60, 0, 0.5); border-radius: 3px;">
+                    <strong>Asteroid 3</strong><br>
+                    Distance: 1.8 km<br>
+                    Ores: Platinum (3 tons)
+                </div>
+            `;
         }
     </script>
 </body>
