@@ -1,0 +1,1489 @@
+if (sortedCargo.length === 0) {
+                const li = document.createElement('li');
+                li.className = 'cargo-item';
+                li.textContent = 'Cargo hold empty';
+                cargoList.appendChild(li);
+            }
+        }
+
+        function updateCrewDisplay() {
+            const crewList = document.getElementById('crew-list');
+            crewList.innerHTML = '';
+            
+            for (let member of gameState.crew) {
+                const li = document.createElement('li');
+                li.className = 'crew-item';
+                li.innerHTML = `<strong>${member.name}</strong><br>${member.type}<br><small>${member.benefit}</small>`;
+                crewList.appendChild(li);
+            }
+            
+            if (gameState.crew.length === 0) {
+                const li = document.createElement('li');
+                li.className = 'crew-item';
+                li.textContent = `Solo operation\n(Crew available at Level ${shipLevels[4] ? '4' : 'N/A'}+)`;
+                crewList.appendChild(li);
+            }
+        }
+
+        function generateAsteroids() {
+            asteroids = [];
+            const scanBonus = getCrewBonus('scanBonus');
+            
+            for (let i = 0; i < 8; i++) {
+                const asteroid = {
+                    id: i,
+                    distance: Math.random() * 10 + 1,
+                    size: Math.random() * 100 + 50,
+                    ores: {}
+                };
+
+                // Generate random ores for this asteroid
+                for (let ore in oreTypes) {
+                    let rarity = oreTypes[ore].rarity;
+                    if (scanBonus > 1 && oreTypes[ore].value > 50) {
+                        rarity *= scanBonus; // Bonus for rare ores
+                    }
+                    
+                    if (Math.random() < rarity) {
+                        asteroid.ores[ore] = Math.floor(Math.random() * 20 + 5);
+                    }
+                }
+
+                asteroids.push(asteroid);
+            }
+        }
+
+        function getCrewBonus(bonusType) {
+            let bonus = 1;
+            for (let member of gameState.crew) {
+                const crewSpec = crewTypes[member.type];
+                if (crewSpec[bonusType]) {
+                    bonus *= crewSpec[bonusType];
+                }
+            }
+            return bonus;
+        }
+
+        function scanAsteroids() {
+            const fuelCost = Math.max(5 * getCrewBonus('fuelEfficiency'), 3);
+            const stationCost = Math.max(20 * getCrewBonus('fuelEfficiency'), 12);
+            
+            if (gameState.fuel < fuelCost) {
+                showMessage("SCANNER OFFLINE - INSUFFICIENT FUEL");
+                return;
+            }
+            
+            // Warn if scanning would leave insufficient fuel to return
+            if (gameState.fuel - fuelCost < stationCost) {
+                showMessage(`FUEL WARNING!\n\nScanning will consume ${fuelCost} fuel.\nAfter scanning, you will have ${gameState.fuel - fuelCost} fuel remaining.\n\nYou need ${stationCost} fuel to return to station safely.\n\nProceed with scan?`, 
+                [
+                    { text: "SCAN ANYWAY", action: () => performScan() },
+                    { text: "ABORT", action: () => log("Scan aborted due to fuel concerns.") }
+                ]);
+                return;
+            }
+
+            performScan();
+        }
+
+        function performScan() {
+            const fuelCost = Math.max(5 * getCrewBonus('fuelEfficiency'), 3);
+            
+            gameState.fuel -= fuelCost;
+            gameState.atStation = false;
+            generateAsteroids();
+            displayAsteroids();
+
+            log("Area scan complete. " + asteroids.length + " asteroids detected.");
+            
+            // Trigger crew interactions occasionally
+            if (gameState.crew.length > 0 && Math.random() < 0.3) {
+                setTimeout(() => triggerCrewInteraction(), 2000);
+            }
+            
+            updateDisplay();
+        }
+
+        function displayAsteroids() {
+            const asteroidList = document.getElementById('asteroid-list');
+            asteroidList.innerHTML = '';
+
+            asteroids.forEach(asteroid => {
+                const li = document.createElement('li');
+                li.className = 'asteroid-item';
+                li.onclick = () => selectAsteroid(asteroid.id);
+                
+                // Calculate asteroid value and best grade
+                let totalValue = 0;
+                let bestGrade = 'F';
+                let gradeOrder = ['SS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
+                let oreDetails = [];
+                
+                for (let ore in asteroid.ores) {
+                    const oreData = oreTypes[ore];
+                    totalValue += oreData.value * asteroid.ores[ore];
+                    
+                    if (gradeOrder.indexOf(oreData.grade) < gradeOrder.indexOf(bestGrade)) {
+                        bestGrade = oreData.grade;
+                    }
+                    
+                    oreDetails.push({
+                        name: ore,
+                        amount: asteroid.ores[ore],
+                        grade: oreData.grade,
+                        value: oreData.value * asteroid.ores[ore]
+                    });
+                }
+                
+                // Sort ores by grade for display
+                oreDetails.sort((a, b) => gradeOrder.indexOf(a.grade) - gradeOrder.indexOf(b.grade));
+                
+                let oreList = oreDetails.map(ore => 
+                    `<span class="ore-grade grade-${ore.grade}">${ore.grade}</span>${ore.name}: ${ore.amount}t`
+                ).join('<br>');
+                
+                if (!oreList) oreList = 'No valuable ores detected';
+                
+                li.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <strong>Asteroid ${asteroid.id + 1}</strong>
+                            <span class="ore-grade grade-${bestGrade}" style="margin-left: 10px;">${bestGrade}</span>
+                        </div>
+                        <div style="text-align: right; font-size: 11px;">
+                            <div>Est. Value: ${totalValue.toLocaleString()}</div>
+                            <div>${asteroid.distance.toFixed(1)} km</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px;">
+                        ${oreList}
+                    </div>
+                `;
+                asteroidList.appendChild(li);
+            });
+        }
+
+        function sortAsteroids(criteria) {
+            // Reset button states
+            document.querySelectorAll('.scanner-controls button').forEach(btn => {
+                btn.style.background = 'rgba(0, 60, 0, 0.8)';
+            });
+            
+            // Highlight active sort button
+            document.getElementById(`sort-${criteria}-btn`).style.background = 'rgba(0, 100, 0, 1)';
+            
+            const gradeOrder = ['SS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
+            
+            asteroids.sort((a, b) => {
+                if (criteria === 'value') {
+                    const valueA = Object.keys(a.ores).reduce((sum, ore) => sum + (oreTypes[ore].value * a.ores[ore]), 0);
+                    const valueB = Object.keys(b.ores).reduce((sum, ore) => sum + (oreTypes[ore].value * b.ores[ore]), 0);
+                    return valueB - valueA; // High to low
+                } else if (criteria === 'distance') {
+                    return a.distance - b.distance; // Near to far
+                } else if (criteria === 'grade') {
+                    const getBestGrade = (asteroid) => {
+                        let bestGrade = 'F';
+                        for (let ore in asteroid.ores) {
+                            const grade = oreTypes[ore].grade;
+                            if (gradeOrder.indexOf(grade) < gradeOrder.indexOf(bestGrade)) {
+                                bestGrade = grade;
+                            }
+                        }
+                        return bestGrade;
+                    };
+                    return gradeOrder.indexOf(getBestGrade(a)) - gradeOrder.indexOf(getBestGrade(b)); // Best to worst
+                }
+                return 0;
+            });
+            
+            displayAsteroids();
+            log(`Asteroids sorted by ${criteria}.`);
+        }
+
+        function selectAsteroid(id) {
+            gameState.selectedAsteroid = id;
+            
+            // Remove previous selection highlighting
+            document.querySelectorAll('.asteroid-item').forEach(item => {
+                item.style.borderColor = 'transparent';
+            });
+            
+            // Highlight selected asteroid
+            event.target.style.borderColor = '#00ff00';
+            
+            log(`Asteroid ${id + 1} selected for mining operations.`);
+            updateButtonStates();
+        }
+
+        function mineAsteroid() {
+            if (gameState.selectedAsteroid === null) {
+                showMessage("NO ASTEROID SELECTED");
+                return;
+            }
+
+            const fuelCost = Math.max(10 * getCrewBonus('fuelEfficiency'), 6);
+            const stationCost = Math.max(20 * getCrewBonus('fuelEfficiency'), 12);
+            
+            if (gameState.fuel < fuelCost) {
+                showMessage("MINING LASER OFFLINE - INSUFFICIENT FUEL");
+                return;
+            }
+
+            const asteroid = asteroids[gameState.selectedAsteroid];
+            if (!asteroid || Object.keys(asteroid.ores).length === 0) {
+                showMessage("ASTEROID DEPLETED OR NO VALUABLE ORES DETECTED");
+                return;
+            }
+
+            if (gameState.cargoUsed >= gameState.cargoMax) {
+                showMessage("CARGO HOLD FULL - RETURN TO STATION TO UNLOAD");
+                return;
+            }
+
+            // Calculate potential value of this asteroid
+            let asteroidValue = 0;
+            let bestOre = '';
+            let bestGrade = 'F';
+            const gradeOrder = ['SS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
+            
+            for (let ore in asteroid.ores) {
+                asteroidValue += oreTypes[ore].value * asteroid.ores[ore];
+                if (gradeOrder.indexOf(oreTypes[ore].grade) < gradeOrder.indexOf(bestGrade)) {
+                    bestGrade = oreTypes[ore].grade;
+                    bestOre = ore;
+                }
+            }
+
+            // Warn if mining would leave insufficient fuel to return
+            if (gameState.fuel - fuelCost < stationCost) {
+                showMessage(`FUEL CRITICAL WARNING!\n\nMining this asteroid will consume ${fuelCost} fuel.\nAfter mining, you will have ${gameState.fuel - fuelCost} fuel remaining.\n\nYou need ${stationCost} fuel to return to station safely.\n\nAsteroid contains: ${bestOre} (Grade ${bestGrade})\nEstimated value: ${asteroidValue.toLocaleString()} credits\n\nProceed with mining operation?`, 
+                [
+                    { text: "MINE ANYWAY", action: () => performMining() },
+                    { text: "ABORT MINING", action: () => log("Mining aborted due to fuel concerns.") }
+                ]);
+                return;
+            }
+
+            // Show mining preview for valuable asteroids
+            if (asteroidValue > 500 || ['A', 'S', 'SS'].includes(bestGrade)) {
+                showMessage(`MINING OPERATION PREVIEW\n\nSelected Asteroid ${gameState.selectedAsteroid + 1}\nBest ore: ${bestOre} (Grade ${bestGrade})\nEstimated value: ${asteroidValue.toLocaleString()} credits\n\nFuel cost: ${fuelCost}\nRemaining fuel after mining: ${gameState.fuel - fuelCost}\nFuel needed to return: ${stationCost}\n\nProceed with mining?`, 
+                [
+                    { text: "BEGIN MINING", action: () => performMining() },
+                    { text: "CANCEL", action: () => log("Mining operation cancelled.") }
+                ]);
+                return;
+            }
+
+            performMining();
+        }
+
+        function performMining() {
+            const fuelCost = Math.max(10 * getCrewBonus('fuelEfficiency'), 6);
+            const asteroid = asteroids[gameState.selectedAsteroid];
+
+            gameState.mining = true;
+            gameState.fuel -= fuelCost;
+            
+            // Calculate mining bonuses from crew
+            const miningBonus = getCrewBonus('miningBonus');
+            const yieldBonus = getCrewBonus('yieldBonus');
+            
+            // Extract random ore from asteroid
+            const availableOres = Object.keys(asteroid.ores);
+            const oreToMine = availableOres[Math.floor(Math.random() * availableOres.length)];
+            let amountMined = Math.min(
+                Math.floor((Math.random() * 5 + 1) * gameState.miningEfficiency * miningBonus * yieldBonus),
+                asteroid.ores[oreToMine],
+                gameState.cargoMax - gameState.cargoUsed
+            );
+
+            asteroid.ores[oreToMine] -= amountMined;
+            if (asteroid.ores[oreToMine] <= 0) {
+                delete asteroid.ores[oreToMine];
+            }
+
+            if (!cargo[oreToMine]) cargo[oreToMine] = 0;
+            cargo[oreToMine] += amountMined;
+            gameState.cargoUsed += amountMined;
+
+            log(`Mined ${amountMined} tons of ${oreToMine} from Asteroid ${gameState.selectedAsteroid + 1}`);
+
+            // Chance of pirate attack after mining valuable ores (higher chance with better ships)
+            if (oreTypes[oreToMine].value > 50 && Math.random() < (0.1 + gameState.shipLevel * 0.02)) {
+                setTimeout(() => pirateAttack(), 2000);
+            }
+
+            // Check for mission opportunities
+            if (Math.random() < 0.1 && !missionAvailable) {
+                setTimeout(() => generateMission(), 3000);
+            }
+
+            updateDisplay();
+            displayAsteroids(); // Refresh asteroid display
+        }
+
+        function goToStation() {
+            const fuelCost = Math.max(20 * getCrewBonus('fuelEfficiency'), 12);
+            
+            if (gameState.fuel < fuelCost) {
+                showMessage(`INSUFFICIENT FUEL FOR STATION TRAVEL\n\nRequired: ${fuelCost} fuel\nCurrent: ${gameState.fuel} fuel\n\nYou are stranded! Consider calling for emergency rescue or look for alternative fuel sources.`);
+                return;
+            }
+
+            gameState.traveling = true;
+            gameState.fuel -= fuelCost;
+            gameState.speed = 150;
+            
+            log("Traveling to Mining Station...");
+            updateButtonStates();
+            
+            setTimeout(() => {
+                gameState.speed = 0;
+                gameState.traveling = false;
+                gameState.atStation = true;
+                arriveAtStation();
+            }, 2000);
+
+            updateDisplay();
+        }
+
+        function arriveAtStation() {
+            let totalValue = 0;
+            let sellMessage = "STATION TRADE SUMMARY:\n\n";
+
+            for (let ore in cargo) {
+                if (cargo[ore] > 0) {
+                    const value = cargo[ore] * oreTypes[ore].value;
+                    totalValue += value;
+                    sellMessage += `${ore}: ${cargo[ore]} tons = ${value} credits\n`;
+                    cargo[ore] = 0;
+                }
+            }
+
+            gameState.credits += totalValue;
+            gameState.cargoUsed = 0;
+            gameState.fuel = Math.min(100, gameState.fuel + 30); // Refuel at station
+
+            // Repair crew bonus
+            const repairRate = getCrewBonus('repairRate');
+            if (repairRate > 1) {
+                gameState.hull = Math.min(100, gameState.hull + repairRate * 5);
+                sellMessage += `\nRepair crew restored ${repairRate * 5}% hull integrity.`;
+            }
+
+            if (totalValue > 0) {
+                sellMessage += `\nTOTAL EARNED: ${totalValue} credits\nFuel topped off. Ready for next mining operation.`;
+                log(`Sold cargo for ${totalValue} credits. Fuel replenished.`);
+            } else {
+                sellMessage = "No cargo to sell. Fuel topped off.";
+                log("No cargo to sell. Fuel replenished.");
+            }
+
+            showMessage(sellMessage);
+            updateDisplay();
+        }
+
+        function pirateAttack() {
+            const damage = Math.floor(Math.random() * 30 + 10);
+            gameState.hull -= damage;
+            gameState.shield = Math.max(0, gameState.shield - 20);
+
+            showMessage(`PIRATE ATTACK DETECTED!\n\nAutomatic weapons engaged...\nHull damage: ${damage}%\nShield damage: 20%\n\nPirate vessel destroyed.\nSalvage recovered: 250 credits`);
+
+            gameState.credits += 250;
+            
+            if (gameState.hull <= 0) {
+                showMessage("CRITICAL HULL BREACH!\n\nEmergency repairs initiated...\nHull integrity restored to 25%");
+                gameState.hull = 25;
+            }
+
+            log("Pirate attack repelled. Salvage collected.");
+            updateDisplay();
+        }
+
+        function generateMission() {
+            missionAvailable = true;
+            showMessage(`INCOMING TRANSMISSION FROM STATION:\n\n"Captain ${gameState.pilotName}, we have a distress signal from coordinates 47.2, 156.8. A cargo vessel has gone missing in the asteroid field. Can you assist in search and rescue? Reward: 1,500 credits plus salvage rights."\n\nAccept mission?`, 
+            [
+                { text: "ACCEPT", action: () => acceptMission() },
+                { text: "DECLINE", action: () => { missionAvailable = false; log("Mission declined."); } }
+            ]);
+        }
+
+        function acceptMission() {
+            missionAvailable = false;
+            log("Rescue mission accepted. Coordinates uploaded to navigation.");
+            setTimeout(() => {
+                const success = Math.random() > 0.3;
+                if (success) {
+                    gameState.credits += 1500;
+                    showMessage("RESCUE SUCCESSFUL!\n\nPilot recovered and cargo salvaged.\nReward: 1,500 credits\nBonus salvage: 500 credits");
+                    gameState.credits += 500;
+                    log("Rescue mission completed successfully.");
+                } else {
+                    gameState.credits += 750;
+                    showMessage("PARTIAL SUCCESS\n\nCargo recovered but pilot was already evacuated by another vessel.\nReward: 750 credits");
+                    log("Rescue mission partially completed.");
+                }
+                updateDisplay();
+            }, 3000);
+        }
+
+        function showUpgrades() {
+            let upgradeMenu = "STATION UPGRADES AVAILABLE:\n\n";
+            
+            // Ship upgrade
+            if (gameState.shipLevel < 10) {
+                const nextLevel = gameState.shipLevel + 1;
+                const cost = shipLevels[gameState.shipLevel].upgradeCost;
+                const newCargo = shipLevels[nextLevel].cargoMax;
+                const newCrewSlots = shipLevels[nextLevel].maxCrewSize;
+                
+                upgradeMenu += `Ship Upgrade to Level ${nextLevel}:\n`;
+                upgradeMenu += `- Cargo: ${gameState.cargoMax} → ${newCargo} tons\n`;
+                upgradeMenu += `- Crew Slots: ${shipLevels[gameState.shipLevel].maxCrewSize} → ${newCrewSlots}\n`;
+                upgradeMenu += `Cost: ${cost.toLocaleString()} credits\n\n`;
+            }
+            
+            // Equipment upgrades
+            upgradeMenu += `Equipment Upgrades:\n`;
+            upgradeMenu += `1. Cargo Hold Expansion (+25 tons) - 2,000 credits\n`;
+            upgradeMenu += `2. Mining Laser Upgrade (+50% efficiency) - 3,000 credits\n`;
+            upgradeMenu += `3. Shield Generator Upgrade (+25% capacity) - 2,500 credits\n`;
+            upgradeMenu += `4. Advanced Scanner (+range) - 1,500 credits\n\n`;
+            
+            // Crew hiring
+            if (gameState.crew.length < shipLevels[gameState.shipLevel].maxCrewSize) {
+                upgradeMenu += `Crew Hiring:\n`;
+                for (let crewType in crewTypes) {
+                    const hasType = gameState.crew.some(c => c.type === crewType);
+                    if (!hasType) {
+                        upgradeMenu += `${crewType} - ${crewTypes[crewType].cost.toLocaleString()} credits\n`;
+                    }
+                }
+                upgradeMenu += '\n';
+            }
+            
+            upgradeMenu += `Current Credits: ${gameState.credits.toLocaleString()}`;
+            
+            let buttons = [{ text: "CLOSE", action: () => {} }];
+            
+            // Add ship upgrade button
+            if (gameState.shipLevel < 10) {
+                const cost = shipLevels[gameState.shipLevel].upgradeCost;
+                if (gameState.credits >= cost) {
+                    buttons.unshift({ text: "UPGRADE SHIP", action: () => upgradeShip() });
+                }
+            }
+            
+            // Add crew hiring buttons
+            if (gameState.crew.length < shipLevels[gameState.shipLevel].maxCrewSize) {
+                for (let crewType in crewTypes) {
+                    const hasType = gameState.crew.some(c => c.type === crewType);
+                    if (!hasType && gameState.credits >= crewTypes[crewType].cost) {
+                        buttons.unshift({ 
+                            text: `HIRE ${crewType.split(' ')[0]}`, 
+                            action: () => hireCrew(crewType) 
+                        });
+                    }
+                }
+            }
+            
+            showMessage(upgradeMenu, buttons);
+        }
+
+        function upgradeShip() {
+            const cost = shipLevels[gameState.shipLevel].upgradeCost;
+            if (gameState.credits >= cost) {
+                gameState.credits -= cost;
+                gameState.shipLevel++;
+                log(`Ship upgraded to Level ${gameState.shipLevel}! New cargo capacity: ${shipLevels[gameState.shipLevel].cargoMax} tons`);
+                updateDisplay();
+                showMessage(`SHIP UPGRADE COMPLETE!\n\nYour vessel is now a Level ${gameState.shipLevel} ship with enhanced capabilities.`);
+            }
+        }
+
+        function hireCrew(crewType) {
+            const cost = crewTypes[crewType].cost;
+            if (gameState.credits >= cost && gameState.crew.length < shipLevels[gameState.shipLevel].maxCrewSize) {
+                gameState.credits -= cost;
+                const names = ['Alex', 'Jordan', 'Sam', 'Casey', 'Morgan', 'Riley', 'Avery', 'Blake', 'Sage', 'Quinn'];
+                const newCrew = {
+                    name: names[Math.floor(Math.random() * names.length)] + ' ' + String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+                    type: crewType,
+                    benefit: crewTypes[crewType].benefit
+                };
+                gameState.crew.push(newCrew);
+                log(`${newCrew.name} hired as ${crewType}`);
+                updateDisplay();
+                
+                // First crew member introduction
+                setTimeout(() => {
+                    showMessage(`"Captain ${gameState.pilotName}, ${newCrew.name} reporting for duty aboard the ${gameState.shipName}. I'm ready to assist with ${crewType.toLowerCase()} operations."\n\nWelcome your new crew member?`, 
+                    [
+                        { text: "WELCOME ABOARD", action: () => log(`${newCrew.name} welcomed to the crew.`) },
+                        { text: "GET TO WORK", action: () => log(`${newCrew.name} begins duties immediately.`) }
+                    ]);
+                }, 1000);
+            }
+        }
+
+        function checkMissions() {
+            if (missionAvailable) {
+                showMessage("ACTIVE MISSION:\n\nSearch and Rescue Operation\nCoordinates: 47.2, 156.8\nReward: 1,500 credits\n\nTravel to coordinates to begin search.");
+            } else {
+                showMessage("NO ACTIVE MISSIONS\n\nCheck back after completing mining operations.");
+            }
+        }
+
+        function managecrew() {
+            if (gameState.crew.length === 0) {
+                showMessage("NO CREW ABOARD\n\nHire specialists at the station to assist with operations.");
+                return;
+            }
+            
+            // Random crew interaction
+            const crewMember = gameState.crew[Math.floor(Math.random() * gameState.crew.length)];
+            triggerCrewInteraction(crewMember);
+        }
+
+        function triggerCrewInteraction(specificCrew = null) {
+            if (gameState.crew.length === 0) return;
+            
+            const crewMember = specificCrew || gameState.crew[Math.floor(Math.random() * gameState.crew.length)];
+            const interactions = {
+                'Mining Specialist': [
+                    {
+                        message: `"Captain ${gameState.pilotName}, I've been analyzing the mineral compositions. Should we focus on higher-value ores even if they're riskier to extract?"`,
+                        responses: [
+                            { text: "PRIORITIZE VALUE", action: () => { gameState.miningEfficiency += 0.1; log(`${crewMember.name} optimizes for valuable ores.`); } },
+                            { text: "STAY SAFE", action: () => { gameState.fuel += 5; log(`${crewMember.name} uses conservative extraction methods.`); } }
+                        ]
+                    },
+                    {
+                        message: `"The mining laser is running hot, Captain. I can push it harder for better yields, but it might strain our power systems."`,
+                        responses: [
+                            { text: "PUSH IT", action: () => { gameState.miningEfficiency += 0.2; gameState.fuel -= 10; log(`${crewMember.name} overcharges the mining laser.`); } },
+                            { text: "PLAY IT SAFE", action: () => { log(`${crewMember.name} maintains safe mining parameters.`); } }
+                        ]
+                    }
+                ],
+                'Repair Technician': [
+                    {
+                        message: `"Captain, I notice some minor hull stress fractures. Should I run a full diagnostic, or patch them quick and dirty?"`,
+                        responses: [
+                            { text: "FULL DIAGNOSTIC", action: () => { gameState.hull += 10; gameState.fuel -= 5; log(`${crewMember.name} performs thorough hull repairs.`); } },
+                            { text: "QUICK PATCH", action: () => { gameState.hull += 5; log(`${crewMember.name} applies temporary hull patches.`); } }
+                        ]
+                    },
+                    {
+                        message: `"The fuel injection system could use some tweaking. I can optimize it for better efficiency if you give me some time."`,
+                        responses: [
+                            { text: "DO IT", action: () => { log(`${crewMember.name} optimizes fuel systems. Future operations will be more efficient.`); } },
+                            { text: "LATER", action: () => { log(`${crewMember.name} will optimize systems when time permits.`); } }
+                        ]
+                    }
+                ],
+                'Scanner Operator': [
+                    {
+                        message: `"Captain, I'm detecting some unusual energy signatures in this sector. Could be rare ores, or could be pirates. Should I investigate?"`,
+                        responses: [
+                            { text: "INVESTIGATE", action: () => { 
+                                if (Math.random() > 0.5) {
+                                    log(`${crewMember.name} discovers a rich Quantum Crystal deposit!`);
+                                    // Add bonus ore to next scan
+                                } else {
+                                    log(`${crewMember.name} detects pirate activity in the area.`);
+                                }
+                            }},
+                            { text: "AVOID IT", action: () => { log(`${crewMember.name} marks the area as potentially hazardous.`); } }
+                        ]
+                    },
+                    {
+                        message: `"I'm picking up distress beacon fragments. Might be worth checking out for salvage, but it could be a pirate trap."`,
+                        responses: [
+                            { text: "CHECK IT OUT", action: () => { 
+                                if (Math.random() > 0.3) {
+                                    gameState.credits += 300;
+                                    log(`${crewMember.name} finds valuable salvage worth 300 credits.`);
+                                } else {
+                                    log(`${crewMember.name} reports it was a false signal.`);
+                                }
+                            }},
+                            { text: "TOO RISKY", action: () => { log(`${crewMember.name} marks the signal as potentially dangerous.`); } }
+                        ]
+                    }
+                ]
+            };
+
+            const crewInteractions = interactions[crewMember.type];
+            if (crewInteractions) {
+                const interaction = crewInteractions[Math.floor(Math.random() * crewInteractions.length)];
+                showMessage(`${crewMember.name} (${crewMember.type}):\n\n${interaction.message}`, interaction.responses);
+            }
+        }
+
+        // Add emergency rescue function for stranded players
+        function emergencyRescue() {
+            if (gameState.fuel >= 20) {
+                showMessage("EMERGENCY RESCUE NOT NEEDED\n\nYou have sufficient fuel to return to station.");
+                return;
+            }
+            
+            const rescueCost = Math.floor(gameState.credits * 0.3); // 30% of credits
+            
+            if (gameState.credits < 500) {
+                showMessage("EMERGENCY RESCUE UNAVAILABLE\n\nInsufficient credits for rescue operation.\nMinimum 500 credits required.\n\nConsider mining nearby ice asteroids for emergency fuel.");
+                return;
+            }
+            
+            showMessage(`EMERGENCY RESCUE SERVICE\n\nA rescue tug can tow your vessel to the nearest station.\n\nCost: ${rescueCost.toLocaleString()} credits (30% of your total)\nYour credits: ${gameState.credits.toLocaleString()}\n\nCall for rescue?`, 
+            [
+                { text: "CALL RESCUE", action: () => {
+                    gameState.credits -= rescueCost;
+                    gameState.fuel = 30;
+                    gameState.atStation = true;
+                    log(`Emergency rescue completed. Towed to station for ${rescueCost} credits.`);
+                    showMessage("RESCUE COMPLETE\n\nYou have been safely towed to the mining station.\nFuel has been partially replenished.");
+                    updateDisplay();
+                }},
+                { text: "DECLINE", action: () => log("Emergency rescue declined.") }
+            ]);
+        }
+
+        function showFuelInfo() {
+            const stationCost = Math.max(20 * getCrewBonus('fuelEfficiency'), 12);
+            const scanCost = Math.max(5 * getCrewBonus('fuelEfficiency'), 3);
+            const mineCost = Math.max(10 * getCrewBonus('fuelEfficiency'), 6);
+            
+            showMessage(`FUEL CONSUMPTION RATES\n\nCurrent Fuel: ${gameState.fuel}%\n\nOperation Costs:\n• Scan Area: ${scanCost} fuel\n• Mine Asteroid: ${mineCost} fuel\n• Travel to Station: ${stationCost} fuel\n\nCrew Efficiency Bonus: ${(getCrewBonus('fuelEfficiency') * 100).toFixed(0)}%\n\nSafe fuel reserve needed: ${stationCost} fuel`);
+        }
+
+        function showGradeInfo() {
+            showMessage(`ORE GRADING SYSTEM DETAILS\n\nGrade | Value Range | Rarity\n\nF - Industrial: 5 credits/ton (Common)\nE - Common: 10 credits/ton (Common)\nD - Standard: 15 credits/ton (Uncommon)\nC - Quality: 50 credits/ton (Rare)\nB - Premium: 100 credits/ton (Very Rare)\nA - Superior: 150 credits/ton (Extremely Rare)\nS - Legendary: 200 credits/ton (Ultra Rare)\nSS - Mythic: 300 credits/ton (Legendary)\n\nHigher grades appear less frequently but offer much greater profits per ton mined.`);
+        }
+
+        function showHelp() {
+            showMessage(`ASTEROID MINING HELP\n\nKEYBOARD CONTROLS:\nS - Scan Area\nM - Mine Selected Asteroid\nT - Travel to Station\nU - Upgrades (at station)\nR - Missions (at station)\nC - Crew Talk\nE - Emergency Rescue\nF - Fuel Information\nG - Grade Information\nH - This Help\nN - New Game\n\nTIPS:\n• Always keep enough fuel to return to station\n• Higher grade ores are more valuable\n• Sort asteroids by value/grade to prioritize\n• Hire crew specialists to improve efficiency\n• Upgrade your ship for larger cargo holds`);
+        }
+
+        function resetGame() {
+            // Reset all game state
+            gameState = {
+                pilotName: '',
+                shipName: '',
+                shipLevel: 1,
+                credits: 1000,
+                fuel: 100,
+                hull: 100,
+                shield: 100,
+                speed: 0,
+                cargoUsed: 0,
+                cargoMax: 50,
+                selectedAsteroid: null,
+                mining: false,
+                traveling: false,
+                atStation: false,
+                miningEfficiency: 1,
+                weaponPower: 1,
+                scannerRange: 1,
+                crew: []
+            };
+            
+            asteroids = [];
+            cargo = {};
+            missionAvailable = false;
+            pendingCrewInteraction = null;
+            
+            // Show setup screen again
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('setup-screen').classList.remove('hidden');
+            
+            // Clear inputs
+            document.getElementById('pilot-name').value = '';
+            document.getElementById('ship-name').value = '';
+            
+            log("Game reset. Enter new pilot and ship details.");
+        }
+
+        function showMessage(message, responseButtons = null) {
+            document.getElementById('message-content').textContent = message;
+            
+            const buttonsDiv = document.getElementById('message-buttons');
+            buttonsDiv.innerHTML = '';
+            
+            if (responseButtons) {
+                responseButtons.forEach(response => {
+                    const btn = document.createElement('button');
+                    btn.className = 'response-btn';
+                    btn.textContent = response.text;
+                    btn.onclick = () => {
+                        response.action();
+                        closeMessage();
+                        updateDisplay();
+                    };
+                    buttonsDiv.appendChild(btn);
+                });
+            } else {
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'close-btn';
+                closeBtn.textContent = 'CLOSE';
+                closeBtn.onclick = closeMessage;
+                buttonsDiv.appendChild(closeBtn);
+            }
+            
+            document.getElementById('message-box').classList.remove('hidden');
+        }
+
+        function closeMessage() {
+            document.getElementById('message-box').classList.add('hidden');
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', function(e) {
+            if (document.getElementById('message-box').classList.contains('hidden') && 
+                !document.getElementById('game-screen').classList.contains('hidden')) {
+                switch(e.key.toLowerCase()) {
+                    case 's': if (!document.getElementById('scan-btn').disabled) scanAsteroids(); break;
+                    case 'm': if (!document.getElementById('mine-btn').disabled) mineAsteroid(); break;
+                    case 't': if (!document.getElementById('station-btn').disabled) goToStation(); break;
+                    case 'u': if (!document.getElementById('upgrade-btn').disabled) showUpgrades(); break;
+                    case 'r': if (!document.getElementById('mission-btn').disabled) checkMissions(); break;
+                    case 'c': if (!document.getElementById('crew-btn').disabled) managecrew(); break;
+                    case 'e': emergencyRescue(); break;
+                    case 'f': showFuelInfo(); break;
+                    case 'g': showGradeInfo(); break;
+                    case 'h': showHelp(); break;
+                    case 'n': if(confirm('Start a new game? Current progress will be lost.')) resetGame(); break;
+                }
+            } else if (e.key === 'Escape' || e.key === 'Enter') {
+                if (!document.getElementById('message-box').classList.contains('hidden')) {
+                    closeMessage();
+                }
+            }
+        });
+
+        // Initialize game with setup screen
+        log("System initialization complete. Enter pilot and ship details to begin.");
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroid Mining Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 40px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 30px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 40px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
+        }
+
+        .control-panel {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(0, 20, 0, 0.9);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 20px #00ff00;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .ship-info {
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .pilot-ship-names {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: rgba(0, 40, 0, 0.7);
+            border: 1px solid #00aa00;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #003300;
+            border: 1px solid #00aa00;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00aa00, #00ff00);
+            transition: width 0.3s;
+        }
+
+        .main-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .scanner, .cargo, .crew {
+            background: rgba(0, 40, 0, 0.7);
+            border: 1px solid #00aa00;
+            padding: 15px;
+            border-radius: 5px;
+            height: 320px;
+            overflow-y: auto;
+        }
+
+        .scanner-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .scanner-controls button {
+            padding: 5px 10px;
+            font-size: 12px;
+            min-width: 80px;
+        }
+
+        .ore-grade {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 11px;
+            margin-right: 5px;
+            border: 1px solid;
+        }
+
+        .grade-F { background: #333; color: #666; border-color: #666; }
+        .grade-E { background: #2b1810; color: #8B4513; border-color: #8B4513; }
+        .grade-D { background: #2b1f0c; color: #CD7F32; border-color: #CD7F32; }
+        .grade-C { background: #252525; color: #C0C0C0; border-color: #C0C0C0; }
+        .grade-B { background: #2b2200; color: #FFD700; border-color: #FFD700; }
+        .grade-A { background: #002b2b; color: #00FFFF; border-color: #00FFFF; }
+        .grade-S { background: #1a0d1a; color: #9966CC; border-color: #9966CC; }
+        .grade-SS { background: #2b0515; color: #FF1493; border-color: #FF1493; }
+
+        .asteroid-value {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 3px;
+        }
+
+        .grade-legend {
+            background: rgba(0, 60, 0, 0.5);
+            border: 1px solid #00aa00;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .grade-legend h4 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            color: #00ff00;
+        }
+
+        .grade-row {
+            display: flex;
+            align-items: center;
+            margin: 3px 0;
+        }
+
+        .grade-row .ore-grade {
+            margin-right: 10px;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .scanner h3, .cargo h3, .crew h3 {
+            margin-top: 0;
+            text-align: center;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .asteroid-list, .cargo-list, .crew-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .asteroid-item, .cargo-item, .crew-item {
+            background: rgba(0, 60, 0, 0.5);
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .asteroid-item:hover {
+            border-color: #00ff00;
+            background: rgba(0, 80, 0, 0.7);
+        }
+
+        .crew-item {
+            cursor: default;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: rgba(0, 60, 0, 0.8);
+            color: #00ff00;
+            border: 1px solid #00aa00;
+            padding: 15px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(0, 80, 0, 1);
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            background: rgba(0, 20, 0, 0.3);
+            border-color: #003300;
+        }
+
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 500px;
+            z-index: 1000;
+            box-shadow: 0 0 30px #00ff00;
+        }
+
+        .message-content {
+            margin-bottom: 15px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+
+        .message-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .close-btn {
+            background: #aa0000;
+            border-color: #ff0000;
+            color: #ffffff;
+        }
+
+        .close-btn:hover {
+            background: #ff0000;
+        }
+
+        .response-btn {
+            background: rgba(0, 80, 0, 0.8);
+            border-color: #00aa00;
+            color: #00ff00;
+            min-width: 80px;
+        }
+
+        .response-btn:hover {
+            background: rgba(0, 100, 0, 1);
+            border-color: #00ff00;
+        }
+
+        .log {
+            background: rgba(0, 40, 0, 0.7);
+            border: 1px solid #00aa00;
+            padding: 15px;
+            border-radius: 5px;
+            height: 150px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .setup-form {
+            background: rgba(0, 40, 0, 0.9);
+            border: 2px solid #00ff00;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            margin: 50px auto;
+        }
+
+        .setup-form input {
+            background: rgba(0, 60, 0, 0.8);
+            border: 1px solid #00aa00;
+            color: #00ff00;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 16px;
+            width: 200px;
+        }
+
+        .setup-form input:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .three-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="setup-screen" class="setup-form">
+        <h2>MINING VESSEL INITIALIZATION</h2>
+        <p>Enter your pilot name and ship designation:</p>
+        <div>
+            <input type="text" id="pilot-name" placeholder="Pilot Name" maxlength="20">
+        </div>
+        <div>
+            <input type="text" id="ship-name" placeholder="Ship Name" maxlength="25">
+        </div>
+        <br>
+        <button onclick="startGame()">INITIALIZE SYSTEMS</button>
+    </div>
+
+    <div id="game-screen" class="control-panel hidden">
+        <div class="title">ASTEROID MINING VESSEL - CONTROL INTERFACE</div>
+        <div class="ship-info">
+            <span id="ship-level">LEVEL 1 VESSEL</span>
+        </div>
+        <div class="pilot-ship-names">
+            Pilot: <span id="display-pilot">Unknown</span> | Ship: <span id="display-ship">Unnamed</span>
+        </div>
+        
+        <div class="status-grid">
+            <div class="status-item">
+                <div class="status-label">SPEED</div>
+                <div class="status-value" id="speed">0 km/s</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">HULL INTEGRITY</div>
+                <div class="status-value" id="hull">100%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="hull-bar" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">FUEL</div>
+                <div class="status-value" id="fuel">100%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="fuel-bar" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">SHIELD STRENGTH</div>
+                <div class="status-value" id="shield">100%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="shield-bar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-grid">
+            <div class="status-item">
+                <div class="status-label">CREDITS</div>
+                <div class="status-value" id="credits">1,000</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">CARGO HOLD</div>
+                <div class="status-value" id="cargo-status">0/50 tons</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="cargo-bar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">MINING EFFICIENCY</div>
+                <div class="status-value" id="mining-eff">Basic</div>
+            </div>
+            <div class="status-item">
+                <div class="status-label">WEAPON SYSTEMS</div>
+                <div class="status-value" id="weapons">Mining Laser</div>
+            </div>
+        </div>
+
+        <div class="grade-legend">
+            <h4>ORE GRADING SYSTEM</h4>
+            <div class="grade-row"><span class="ore-grade grade-F">F</span> Industrial (5-10 credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-E">E</span> Common (10-15 credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-D">D</span> Standard (15-25 credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-C">C</span> Quality (50+ credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-B">B</span> Premium (100+ credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-A">A</span> Superior (150+ credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-S">S</span> Legendary (200+ credits/ton)</div>
+            <div class="grade-row"><span class="ore-grade grade-SS">SS</span> Mythic (300+ credits/ton)</div>
+        </div>
+
+        <div class="three-column">
+            <div class="scanner">
+                <h3>SCANNER - NEARBY ASTEROIDS</h3>
+                <div class="scanner-controls">
+                    <button onclick="sortAsteroids('value')" id="sort-value-btn">BY VALUE</button>
+                    <button onclick="sortAsteroids('distance')" id="sort-distance-btn">BY DISTANCE</button>
+                    <button onclick="sortAsteroids('grade')" id="sort-grade-btn">BY GRADE</button>
+                </div>
+                <ul class="asteroid-list" id="asteroid-list"></ul>
+            </div>
+            <div class="cargo">
+                <h3>CARGO MANIFEST</h3>
+                <ul class="cargo-list" id="cargo-list"></ul>
+            </div>
+            <div class="crew">
+                <h3>CREW ROSTER</h3>
+                <ul class="crew-list" id="crew-list"></ul>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="scan-btn" onclick="scanAsteroids()">SCAN AREA (S)</button>
+            <button id="mine-btn" onclick="mineAsteroid()" disabled>MINE ASTEROID (M)</button>
+            <button id="station-btn" onclick="goToStation()">GO TO STATION (T)</button>
+            <button id="upgrade-btn" onclick="showUpgrades()" disabled>UPGRADES (U)</button>
+            <button id="mission-btn" onclick="checkMissions()" disabled>MISSIONS (R)</button>
+            <button id="crew-btn" onclick="managecrew()" disabled>CREW TALK (C)</button>
+        </div>
+
+        <div class="controls">
+            <button id="rescue-btn" onclick="emergencyRescue()">EMERGENCY (E)</button>
+            <button onclick="showMessage('AUTOPILOT SYSTEM:\\n\\nThis feature will be available in the next update.\\nManual control required for all operations.')">AUTO PILOT (A)</button>
+            <button onclick="showFuelInfo()">FUEL INFO (F)</button>
+            <button onclick="showGradeInfo()">GRADE INFO (G)</button>
+            <button onclick="showHelp()">HELP (H)</button>
+            <button onclick="resetGame()">NEW GAME (N)</button>
+        </div>
+
+        <div class="log">
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <div id="message-box" class="message-box hidden">
+        <div class="message-content" id="message-content"></div>
+        <div class="message-buttons" id="message-buttons">
+            <button class="close-btn" onclick="closeMessage()">CLOSE</button>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            pilotName: '',
+            shipName: '',
+            shipLevel: 1,
+            credits: 1000,
+            fuel: 100,
+            hull: 100,
+            shield: 100,
+            speed: 0,
+            cargoUsed: 0,
+            cargoMax: 50,
+            selectedAsteroid: null,
+            mining: false,
+            traveling: false,
+            atStation: false,
+            miningEfficiency: 1,
+            weaponPower: 1,
+            scannerRange: 1,
+            crew: []
+        };
+
+        let asteroids = [];
+        let cargo = {};
+        let missionAvailable = false;
+        let pendingCrewInteraction = null;
+
+        // Ship level configurations
+        const shipLevels = {
+            1: { cargoMax: 50, maxCrewSize: 0, upgradeCost: 5000 },
+            2: { cargoMax: 75, maxCrewSize: 0, upgradeCost: 8000 },
+            3: { cargoMax: 100, maxCrewSize: 0, upgradeCost: 12000 },
+            4: { cargoMax: 125, maxCrewSize: 1, upgradeCost: 18000 },
+            5: { cargoMax: 150, maxCrewSize: 1, upgradeCost: 25000 },
+            6: { cargoMax: 200, maxCrewSize: 2, upgradeCost: 35000 },
+            7: { cargoMax: 250, maxCrewSize: 2, upgradeCost: 50000 },
+            8: { cargoMax: 300, maxCrewSize: 3, upgradeCost: 70000 },
+            9: { cargoMax: 400, maxCrewSize: 3, upgradeCost: 100000 },
+            10: { cargoMax: 500, maxCrewSize: 3, upgradeCost: 0 }
+        };
+
+        // Crew specialists
+        const crewTypes = {
+            'Mining Specialist': {
+                cost: 3000,
+                benefit: 'Increases mining efficiency by 50% and ore yield by 10%',
+                miningBonus: 1.5,
+                yieldBonus: 1.1
+            },
+            'Repair Technician': {
+                cost: 2500,
+                benefit: 'Repairs hull damage over time and reduces fuel consumption',
+                repairRate: 2,
+                fuelEfficiency: 0.8
+            },
+            'Scanner Operator': {
+                cost: 3500,
+                benefit: 'Detects rare ores more easily and extends scanner range',
+                scanBonus: 1.5,
+                rareOreBonus: 1.3
+            }
+        };
+
+        // Ore types with values and grades
+        const oreTypes = {
+            'Ice': { value: 5, rarity: 0.6, color: '#87CEEB', grade: 'F', category: 'Industrial' },
+            'Iron': { value: 10, rarity: 0.8, color: '#8B4513', grade: 'E', category: 'Common Metal' },
+            'Copper': { value: 15, rarity: 0.7, color: '#B87333', grade: 'D', category: 'Common Metal' },
+            'Titanium': { value: 50, rarity: 0.4, color: '#C0C0C0', grade: 'C', category: 'Rare Metal' },
+            'Platinum': { value: 100, rarity: 0.2, color: '#E5E4E2', grade: 'B', category: 'Precious Metal' },
+            'Nebulite': { value: 150, rarity: 0.15, color: '#00FFFF', grade: 'A', category: 'Exotic Crystal' },
+            'Quantum Crystal': { value: 200, rarity: 0.1, color: '#9966CC', grade: 'S', category: 'Quantum Material' },
+            'Voidstone': { value: 300, rarity: 0.05, color: '#800080', grade: 'SS', category: 'Ultra-Rare' }
+        };
+
+        // Grade colors for visual distinction
+        const gradeColors = {
+            'F': '#666666',   // Gray
+            'E': '#8B4513',   // Brown  
+            'D': '#CD7F32',   // Bronze
+            'C': '#C0C0C0',   // Silver
+            'B': '#FFD700',   // Gold
+            'A': '#00FFFF',   // Cyan
+            'S': '#9966CC',   // Purple
+            'SS': '#FF1493'   // Hot Pink
+        };
+
+        // Grade descriptions
+        const gradeInfo = {
+            'F': 'Industrial Grade - Low value, abundant',
+            'E': 'Common Grade - Basic value, very common',
+            'D': 'Standard Grade - Fair value, common',
+            'C': 'Quality Grade - Good value, uncommon',
+            'B': 'Premium Grade - High value, rare',
+            'A': 'Superior Grade - Very high value, very rare',
+            'S': 'Legendary Grade - Exceptional value, extremely rare',
+            'SS': 'Mythic Grade - Ultimate value, ultra rare'
+        };
+
+        function startGame() {
+            const pilotName = document.getElementById('pilot-name').value.trim();
+            const shipName = document.getElementById('ship-name').value.trim();
+            
+            if (!pilotName || !shipName) {
+                alert('Please enter both pilot name and ship name.');
+                return;
+            }
+
+            gameState.pilotName = pilotName;
+            gameState.shipName = shipName;
+            
+            document.getElementById('display-pilot').textContent = pilotName;
+            document.getElementById('display-ship').textContent = shipName;
+            
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            generateAsteroids();
+            performScan();
+            updateDisplay();
+            updateButtonStates();
+            log(`Welcome aboard, Captain ${pilotName}. The ${shipName} is ready for operations.`);
+        }
+
+        function updateButtonStates() {
+            const stationFuelCost = Math.max(20 * getCrewBonus('fuelEfficiency'), 12);
+            const scanFuelCost = Math.max(5 * getCrewBonus('fuelEfficiency'), 3);
+            const mineFuelCost = Math.max(10 * getCrewBonus('fuelEfficiency'), 6);
+            
+            // Scan button - available if fuel > scan cost + station return cost
+            const canScanSafely = gameState.fuel >= (scanFuelCost + stationFuelCost);
+            document.getElementById('scan-btn').disabled = gameState.fuel < scanFuelCost;
+            
+            // Mine button - available if asteroid selected and can mine + return safely
+            const canMineSafely = gameState.fuel >= (mineFuelCost + stationFuelCost);
+            document.getElementById('mine-btn').disabled = 
+                (gameState.selectedAsteroid === null) || 
+                gameState.fuel < mineFuelCost || 
+                gameState.cargoUsed >= gameState.cargoMax;
+            
+            // Station button - available if fuel > 20
+            document.getElementById('station-btn').disabled = gameState.fuel < stationFuelCost;
+            
+            // Upgrade button - only at station
+            document.getElementById('upgrade-btn').disabled = !gameState.atStation;
+            
+            // Mission button - only at station
+            document.getElementById('mission-btn').disabled = !gameState.atStation;
+            
+            // Crew button - available if crew exists and not traveling
+            document.getElementById('crew-btn').disabled = gameState.crew.length === 0 || gameState.traveling;
+            
+            // Update fuel warning in display
+            updateFuelWarnings(stationFuelCost, scanFuelCost, mineFuelCost);
+        }
+
+        function updateFuelWarnings(stationCost, scanCost, mineCost) {
+            // Remove existing warnings
+            const existingWarning = document.getElementById('fuel-warning');
+            if (existingWarning) {
+                existingWarning.remove();
+            }
+            
+            // Add fuel status after fuel display
+            const fuelItem = document.getElementById('fuel').parentElement;
+            const warningDiv = document.createElement('div');
+            warningDiv.id = 'fuel-warning';
+            warningDiv.style.fontSize = '10px';
+            warningDiv.style.marginTop = '3px';
+            warningDiv.style.textAlign = 'center';
+            
+            if (gameState.fuel < stationCost) {
+                warningDiv.style.color = '#ff4444';
+                warningDiv.textContent = '⚠ STRANDED! Insufficient fuel to return!';
+            } else if (gameState.fuel < (mineCost + stationCost)) {
+                warningDiv.style.color = '#ffaa00';
+                warningDiv.textContent = `⚠ ${stationCost} fuel needed to return`;
+            } else if (gameState.fuel < (scanCost + stationCost + mineCost)) {
+                warningDiv.style.color = '#ffff00';
+                warningDiv.textContent = `${stationCost} fuel needed to return`;
+            } else {
+                warningDiv.style.color = '#00aa00';
+                warningDiv.textContent = `${stationCost} fuel needed to return`;
+            }
+            
+            fuelItem.appendChild(warningDiv);
+        }
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateDisplay() {
+            document.getElementById('ship-level').textContent = `LEVEL ${gameState.shipLevel} VESSEL`;
+            document.getElementById('credits').textContent = gameState.credits.toLocaleString();
+            document.getElementById('fuel').textContent = Math.round(gameState.fuel) + '%';
+            document.getElementById('hull').textContent = Math.round(gameState.hull) + '%';
+            document.getElementById('shield').textContent = Math.round(gameState.shield) + '%';
+            document.getElementById('speed').textContent = gameState.speed + ' km/s';
+            
+            gameState.cargoMax = shipLevels[gameState.shipLevel].cargoMax;
+            document.getElementById('cargo-status').textContent = `${gameState.cargoUsed}/${gameState.cargoMax} tons`;
+            
+            document.getElementById('fuel-bar').style.width = gameState.fuel + '%';
+            document.getElementById('hull-bar').style.width = gameState.hull + '%';
+            document.getElementById('shield-bar').style.width = gameState.shield + '%';
+            document.getElementById('cargo-bar').style.width = (gameState.cargoUsed / gameState.cargoMax) * 100 + '%';
+
+            updateCargoDisplay();
+            updateCrewDisplay();
+            updateButtonStates();
+        }
+
+        function updateCargoDisplay() {
+            const cargoList = document.getElementById('cargo-list');
+            cargoList.innerHTML = '';
+            
+            // Sort cargo by grade for better display
+            const sortedCargo = Object.keys(cargo).filter(ore => cargo[ore] > 0)
+                .sort((a, b) => {
+                    const gradeOrder = ['SS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
+                    return gradeOrder.indexOf(oreTypes[a].grade) - gradeOrder.indexOf(oreTypes[b].grade);
+                });
+            
+            for (let ore of sortedCargo) {
+                const li = document.createElement('li');
+                li.className = 'cargo-item';
+                const grade = oreTypes[ore].grade;
+                const totalValue = oreTypes[ore].value * cargo[ore];
+                li.innerHTML = `
+                    <span class="ore-grade grade-${grade}">${grade}</span>
+                    <strong>${ore}</strong>: ${cargo[ore]} tons<br>
+                    <span class="asteroid-value">Value: ${totalValue.toLocaleString()} credits | ${oreTypes[ore].category}</span>
+                `;
+                cargoList.appendChild(li);
+            }
+            
+            if (sortedCargo.length === 0) {
+                const li = document.
