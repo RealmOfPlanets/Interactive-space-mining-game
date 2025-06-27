@@ -464,7 +464,30 @@
 
 function goToStation() {
             if (gameState.fuel < 20) {
-                alert('Insufficient fuel for station travel!');
+                // Emergency rescue system
+                const rescueCost = Math.floor(gameState.credits * 0.25); // 25% of credits
+                
+                if (gameState.credits < 100) {
+                    alert('STRANDED!\n\nInsufficient fuel to reach station and insufficient credits for emergency rescue.\n\nGame Over - Consider this a learning experience about fuel management!');
+                    return;
+                }
+
+                const rescueMessage = `EMERGENCY SITUATION!
+
+You have ${gameState.fuel}% fuel remaining.
+You need 20% fuel to reach the station.
+
+EMERGENCY RESCUE AVAILABLE:
+- Rescue Tug Service: ${rescueCost} credits (25% of your total)
+- Current Credits: ${gameState.credits.toLocaleString()}
+
+Would you like to request emergency rescue?`;
+
+                if (confirm(rescueMessage)) {
+                    requestRescue(rescueCost);
+                } else {
+                    alert('Emergency rescue declined. You remain stranded in space.\n\nUse the scanner to look for ice asteroids - they can be mined for emergency fuel!');
+                }
                 return;
             }
 
@@ -495,6 +518,73 @@ function goToStation() {
             // Show station interface
             showStationInterface();
             updateDisplay();
+        }
+
+        function requestRescue(cost) {
+            if (!confirm('CONFIRM EMERGENCY RESCUE REQUEST\n\nThis will cost you ' + cost + ' credits.\n\nProceed with rescue operation?')) {
+                alert('Rescue request cancelled. You remain stranded.');
+                return;
+            }
+
+            // Deduct rescue cost
+            gameState.credits -= cost;
+            log(`Emergency rescue requested. Cost: ${cost} credits.`);
+            
+            // Show rescue sequence
+            alert('RESCUE REQUEST TRANSMITTED...\n\nSearching for available rescue vessels...');
+            
+            setTimeout(() => {
+                alert('INCOMING TRANSMISSION:\n\n"This is Station Control. We have a rescue tug en route to your position. Estimated arrival: 2 minutes. Standby."');
+                
+                setTimeout(() => {
+                    alert('PROXIMITY ALERT!\n\nRescue vessel approaching...');
+                    
+                    setTimeout(() => {
+                        const rescueMessages = [
+                            '"Hey there! I\'m Frank. I heard you\'re stuck and need a tow! Hang on, we\'ll be back at the station in a minute."',
+                            '"This is Captain Sarah on the rescue tug. Don\'t worry, we\'ve got you covered! Engaging tow cables now."',
+                            '"Rescue Operator Mike here! Looks like someone got a bit too adventurous with their fuel gauge. Let\'s get you home safe!"',
+                            '"Tug boat pilot Rodriguez reporting. Another stranded miner? No worries, happens to the best of us. Tow cables secured!"'
+                        ];
+                        
+                        const randomMessage = rescueMessages[Math.floor(Math.random() * rescueMessages.length)];
+                        alert('RESCUE PILOT COMMUNICATION:\n\n' + randomMessage);
+                        
+                        setTimeout(() => {
+                            alert('TOW IN PROGRESS...\n\n*Your ship is being carefully towed back to the station*\n\n*Docking procedures initiated*');
+                            
+                            setTimeout(() => {
+                                // Arrive at station with emergency status
+                                gameState.fuel = 5; // Emergency fuel reserve
+                                gameState.atStation = true;
+                                
+                                // Sell any cargo
+                                let totalValue = 0;
+                                for (let ore in cargo) {
+                                    if (cargo[ore] > 0) {
+                                        const value = cargo[ore] * oreTypes[ore].value;
+                                        totalValue += value;
+                                        log(`Sold ${cargo[ore]} tons of ${ore} for ${value} credits`);
+                                        cargo[ore] = 0;
+                                    }
+                                }
+                                gameState.credits += totalValue;
+                                gameState.cargoUsed = 0;
+                                
+                                alert('RESCUE COMPLETE!\n\nYou have been safely towed to the mining station.\n\nEmergency fuel reserves: 5%\nCargo automatically sold during rescue.\n\nYou can now refuel and continue operations.');
+                                
+                                log('Emergency rescue completed. Arrived safely at station.');
+                                if (totalValue > 0) {
+                                    log(`Cargo sold during rescue: ${totalValue} credits earned.`);
+                                }
+                                
+                                showStationInterface();
+                                updateDisplay();
+                            }, 2000);
+                        }, 2000);
+                    }, 1500);
+                }, 2000);
+            }, 1500);
         }
 
         function showStationInterface() {
