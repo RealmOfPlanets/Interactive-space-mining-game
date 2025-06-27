@@ -379,6 +379,20 @@ let oreListWithGrades = Object.keys(asteroid.ores).map(ore => {
                 
                 if (!oreListWithGrades) oreListWithGrades = 'No valuable ores detected';
                 
+let oreListWithGrades = Object.keys(asteroid.ores).map(ore => {
+                    const grade = oreTypes[ore].grade;
+                    const gradeColor = grade === 'SS' ? '#ff1493' : 
+                                     grade === 'S' ? '#9966cc' : 
+                                     grade === 'A' ? '#00ffff' : 
+                                     grade === 'B' ? '#ffd700' : 
+                                     grade === 'C' ? '#c0c0c0' : 
+                                     grade === 'D' ? '#cd7f32' : 
+                                     grade === 'E' ? '#8b4513' : '#666666';
+                    return `<span style="color: ${gradeColor}; font-weight: bold;">[${grade}]</span> ${ore}: ${asteroid.ores[ore]}t`;
+                }).join('<br>');
+                
+                if (!oreListWithGrades) oreListWithGrades = 'No valuable ores detected';
+                
                 div.innerHTML = `
                     <strong>Asteroid ${asteroid.id + 1}</strong><br>
                     Distance: ${asteroid.distance.toFixed(1)} km<br>
