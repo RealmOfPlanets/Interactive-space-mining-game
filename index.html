@@ -238,12 +238,17 @@
         let asteroids = [];
         let cargo = {};
 
-        const oreTypes = {
-            'Iron': { value: 10, rarity: 0.8 },
-            'Copper': { value: 15, rarity: 0.7 },
-            'Titanium': { value: 50, rarity: 0.4 },
-            'Platinum': { value: 100, rarity: 0.2 },
-            'Ice': { value: 5, rarity: 0.6 }
+const oreTypes = {
+            'Ice': { value: 5, rarity: 0.8, grade: 'F' },
+            'Iron': { value: 10, rarity: 0.7, grade: 'E' },
+            'Copper': { value: 15, rarity: 0.6, grade: 'D' },
+            'Nickel': { value: 25, rarity: 0.5, grade: 'D' },
+            'Titanium': { value: 50, rarity: 0.4, grade: 'C' },
+            'Palladium': { value: 80, rarity: 0.3, grade: 'B' },
+            'Platinum': { value: 100, rarity: 0.2, grade: 'B' },
+            'Nebulite': { value: 150, rarity: 0.15, grade: 'A' },
+            'Quantum Crystal': { value: 200, rarity: 0.1, grade: 'S' },
+            'Voidstone': { value: 300, rarity: 0.05, grade: 'SS' }
         };
 
         function log(message) {
