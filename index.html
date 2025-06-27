@@ -373,21 +373,32 @@
             log(`Asteroid ${id + 1} selected for mining operations.`);
         }
 
-        function mineAsteroid() {
-            if (gameState.selectedAsteroid === null) {
-                alert('No asteroid selected!');
-                return;
-            }
+function mineAsteroid() {
+    if (gameState.selectedAsteroid === null) {
+        alert('No asteroid selected!');
+        return;
+    }
 
-            if (gameState.fuel < 10) {
-                alert('Insufficient fuel for mining!');
-                return;
-            }
+    const mineFuelCost = 10;
+    const stationFuelCost = 20;
 
-            if (gameState.cargoUsed >= gameState.cargoMax) {
-                alert('Cargo hold full! Return to station.');
-                return;
-            }
+    if (gameState.fuel < mineFuelCost) {
+        alert('Mining laser offline - insufficient fuel!');
+        return;
+    }
+
+    // Warn if mining would leave insufficient fuel to return
+    if (gameState.fuel - mineFuelCost < stationFuelCost) {
+        const remainingFuel = gameState.fuel - mineFuelCost;
+        if (!confirm(`FUEL WARNING!\n\nMining will consume ${mineFuelCost} fuel.\nAfter mining, you'll have ${remainingFuel} fuel remaining.\nYou need ${stationFuelCost} fuel to return to station.\n\nProceed with mining operation?`)) {
+            return;
+        }
+    }
+
+    if (gameState.cargoUsed >= gameState.cargoMax) {
+        alert('Cargo hold full! Return to station.');
+        return;
+    }
 
             const asteroid = asteroids[gameState.selectedAsteroid];
             const availableOres = Object.keys(asteroid.ores);
