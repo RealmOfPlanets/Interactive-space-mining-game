@@ -71,7 +71,7 @@
             border: 1px solid #00aa00;
             padding: 15px;
             border-radius: 5px;
-            height: 400px;
+            height: 300px;
             overflow-y: auto;
         }
         .asteroid-item, .cargo-item {
@@ -192,7 +192,7 @@
             </div>
         </div>
 
-<div class="main-display">
+        <div class="main-display">
             <div class="scanner">
                 <h3>SCANNER - NEARBY ASTEROIDS</h3>
                 <div style="font-size: 11px; color: #ffff00; margin-bottom: 10px; text-align: center;">
@@ -238,7 +238,7 @@
         let asteroids = [];
         let cargo = {};
 
-const oreTypes = {
+        const oreTypes = {
             'Ice': { value: 5, rarity: 0.8, grade: 'F' },
             'Iron': { value: 10, rarity: 0.7, grade: 'E' },
             'Copper': { value: 15, rarity: 0.6, grade: 'D' },
@@ -332,23 +332,24 @@ const oreTypes = {
             }
         }
 
-const scanFuelCost = 5;
-const stationFuelCost = 20;
+        function scanAsteroids() {
+            const scanFuelCost = 5;
+            const stationFuelCost = 20;
 
-if (gameState.fuel < scanFuelCost) {
-    alert('Scanner offline - insufficient fuel!');
-    return;
-}
+            if (gameState.fuel < scanFuelCost) {
+                alert('Scanner offline - insufficient fuel!');
+                return;
+            }
 
-// Warn if scanning would leave insufficient fuel to return
-if (gameState.fuel - scanFuelCost < stationFuelCost) {
-    const remainingFuel = gameState.fuel - scanFuelCost;
-    if (!confirm(`FUEL WARNING!\n\nScanning will consume ${scanFuelCost} fuel.\nAfter scanning, you'll have ${remainingFuel} fuel remaining.\nYou need ${stationFuelCost} fuel to return to station.\n\nProceed with scan?`)) {
-        return;
-    }
-}
+            // Warn if scanning would leave insufficient fuel to return
+            if (gameState.fuel - scanFuelCost < stationFuelCost) {
+                const remainingFuel = gameState.fuel - scanFuelCost;
+                if (!confirm(`FUEL WARNING!\n\nScanning will consume ${scanFuelCost} fuel.\nAfter scanning, you'll have ${remainingFuel} fuel remaining.\nYou need ${stationFuelCost} fuel to return to station.\n\nProceed with scan?`)) {
+                    return;
+                }
+            }
 
-            gameState.fuel -= 5;
+            gameState.fuel -= scanFuelCost;
             generateAsteroids();
             
             const asteroidList = document.getElementById('asteroid-list');
@@ -359,27 +360,7 @@ if (gameState.fuel - scanFuelCost < stationFuelCost) {
                 div.className = 'asteroid-item';
                 div.onclick = () => selectAsteroid(asteroid.id);
                 
-                let oreList = Object.keys(asteroid.ores).map(ore => 
-                    `${ore}: ${asteroid.ores[ore]}t`
-                ).join(', ');
-                
-                if (!oreList) oreList = 'No valuable ores detected';
-                
-let oreListWithGrades = Object.keys(asteroid.ores).map(ore => {
-                    const grade = oreTypes[ore].grade;
-                    const gradeColor = grade === 'SS' ? '#ff1493' : 
-                                     grade === 'S' ? '#9966cc' : 
-                                     grade === 'A' ? '#00ffff' : 
-                                     grade === 'B' ? '#ffd700' : 
-                                     grade === 'C' ? '#c0c0c0' : 
-                                     grade === 'D' ? '#cd7f32' : 
-                                     grade === 'E' ? '#8b4513' : '#666666';
-                    return `<span style="color: ${gradeColor}; font-weight: bold;">[${grade}]</span> ${ore}: ${asteroid.ores[ore]}t`;
-                }).join('<br>');
-                
-                if (!oreListWithGrades) oreListWithGrades = 'No valuable ores detected';
-                
-let oreListWithGrades = Object.keys(asteroid.ores).map(ore => {
+                let oreListWithGrades = Object.keys(asteroid.ores).map(ore => {
                     const grade = oreTypes[ore].grade;
                     const gradeColor = grade === 'SS' ? '#ff1493' : 
                                      grade === 'S' ? '#9966cc' : 
@@ -420,32 +401,32 @@ let oreListWithGrades = Object.keys(asteroid.ores).map(ore => {
             log(`Asteroid ${id + 1} selected for mining operations.`);
         }
 
-function mineAsteroid() {
-    if (gameState.selectedAsteroid === null) {
-        alert('No asteroid selected!');
-        return;
-    }
+        function mineAsteroid() {
+            if (gameState.selectedAsteroid === null) {
+                alert('No asteroid selected!');
+                return;
+            }
 
-    const mineFuelCost = 10;
-    const stationFuelCost = 20;
+            const mineFuelCost = 10;
+            const stationFuelCost = 20;
 
-    if (gameState.fuel < mineFuelCost) {
-        alert('Mining laser offline - insufficient fuel!');
-        return;
-    }
+            if (gameState.fuel < mineFuelCost) {
+                alert('Mining laser offline - insufficient fuel!');
+                return;
+            }
 
-    // Warn if mining would leave insufficient fuel to return
-    if (gameState.fuel - mineFuelCost < stationFuelCost) {
-        const remainingFuel = gameState.fuel - mineFuelCost;
-        if (!confirm(`FUEL WARNING!\n\nMining will consume ${mineFuelCost} fuel.\nAfter mining, you'll have ${remainingFuel} fuel remaining.\nYou need ${stationFuelCost} fuel to return to station.\n\nProceed with mining operation?`)) {
-            return;
-        }
-    }
+            // Warn if mining would leave insufficient fuel to return
+            if (gameState.fuel - mineFuelCost < stationFuelCost) {
+                const remainingFuel = gameState.fuel - mineFuelCost;
+                if (!confirm(`FUEL WARNING!\n\nMining will consume ${mineFuelCost} fuel.\nAfter mining, you'll have ${remainingFuel} fuel remaining.\nYou need ${stationFuelCost} fuel to return to station.\n\nProceed with mining operation?`)) {
+                    return;
+                }
+            }
 
-    if (gameState.cargoUsed >= gameState.cargoMax) {
-        alert('Cargo hold full! Return to station.');
-        return;
-    }
+            if (gameState.cargoUsed >= gameState.cargoMax) {
+                alert('Cargo hold full! Return to station.');
+                return;
+            }
 
             const asteroid = asteroids[gameState.selectedAsteroid];
             const availableOres = Object.keys(asteroid.ores);
@@ -455,7 +436,7 @@ function mineAsteroid() {
                 return;
             }
 
-            gameState.fuel -= 10;
+            gameState.fuel -= mineFuelCost;
             
             // Extract random ore
             const oreToMine = availableOres[Math.floor(Math.random() * availableOres.length)];
