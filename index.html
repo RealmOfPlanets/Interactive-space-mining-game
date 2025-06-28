@@ -151,9 +151,32 @@
             margin: 2px 0;
             opacity: 0.9;
         }
+        .character-popup {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 200px;
+            height: 250px;
+            background-image: url('https://images.squarespace-cdn.com/content/653bf4b74539f95880af95f4/73707e02-b55b-436a-bbc4-57cebbf99050/Yen-Lakrenza.png?content-type=image%2Fpng');
+            background-size: cover;
+            background-position: center;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(-100%);
+            transition: all 0.5s ease;
+        }
+        
+        .character-popup.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
     </style>
 </head>
 <body>
+    <div id="yen-popup" class="character-popup"></div>
     <div id="setup-screen" class="setup-form">
         <h2>MINING VESSEL INITIALIZATION</h2>
         <p>Enter your pilot name and ship designation:</p>
@@ -237,6 +260,35 @@
 
         let asteroids = [];
         let cargo = {};
+                const yenAudio = new Audio('https://static1.squarespace.com/static/653bf4b74539f95880af95f4/t/685f559f33278070e508216c/1751078305197/Lily_I+am+agent+Yen+Lakrenza+of+realm+security.mp3/original/Lily_I+am+agent+Yen+Lakrenza+of+realm+security.mp3');
+        let yenHasAppeared = false;
+
+        function showYenLakrenza() {
+            if (yenHasAppeared) return; // Only show once per game session
+            
+            yenHasAppeared = true;
+            const yenPopup = document.getElementById('yen-popup');
+            
+            log('Incoming transmission...');
+            
+            setTimeout(() => {
+                yenPopup.classList.add('show');
+                log('Agent Yen Lakrenza of Realm Security - Audio transmission received');
+                
+                setTimeout(() => {
+                    yenAudio.play().catch(e => {
+                        console.log('Audio play failed:', e);
+                        log('Audio transmission failed - browser may require user interaction first');
+                    });
+                }, 500);
+                
+                // Hide Yen after audio finishes (approximately 4 seconds)
+                setTimeout(() => {
+                    yenPopup.classList.remove('show');
+                    log('Transmission ended');
+                }, 6000);
+            }, 1000);
+        }
 
         const oreTypes = {
             'Ice': { value: 5, rarity: 0.8, grade: 'F' },
