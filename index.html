@@ -560,6 +560,12 @@ Would you like to request emergency rescue?`;
             gameState.credits += totalValue;
             gameState.cargoUsed = 0;
             gameState.fuel = Math.min(100, gameState.fuel + 30);
+                // Check if this was a full cargo run
+            if (totalValue > 200) { // If player sold a good amount of cargo
+                setTimeout(() => {
+                    showYenLakrenza();
+                }, 2000); // Show Yen 2 seconds after arriving at station
+            }
 
             if (totalValue > 0) {
                 log(`Arrived at station. Total earned: ${totalValue} credits. Fuel partially replenished.`);
